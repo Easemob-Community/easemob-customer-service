@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: easemob-customer-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:easemob_customer}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    timeout: 5s
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+easemob:
+  org-name: ${EASEMOB_ORG:easemob-demo}
+  app-name: ${EASEMOB_APP:support}
+  client-id: ${EASEMOB_CLIENT_ID:your-client-id}
+  client-secret: ${EASEMOB_CLIENT_SECRET:your-client-secret}
+  base-url: ${EASEMOB_BASE_URL:https://a1.easemob.com}
+  callback-secret: ${EASEMOB_CALLBACK_SECRET:your-callback-secret}
+
+sa-token:
+  token-name: Authorization
+  timeout: 7200
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+logging:
+  level:
+    com.easemob.customer: info
