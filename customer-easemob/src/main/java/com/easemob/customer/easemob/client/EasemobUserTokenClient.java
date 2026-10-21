@@ -49,20 +49,24 @@ public class EasemobUserTokenClient {
                 .header("Content-Type", "application/json")
                 .build();
         try (Response response = http.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                log.warn("Easemob user token fetch failed (will try register): {}", response);
+            String respBody = response.body() == null ? null : response.body().string();
+            if (!response.isSuccessful()) {
+                log.warn("获取环信用户token失败(将尝试注册), username={}, status={}, responseBody={}",
+                        username, response.code(), respBody);
                 return null;
             }
-            Map<String, Object> map = JsonUtil.fromJson(response.body().string(),
+            Map<String, Object> map = JsonUtil.fromJson(respBody,
                     new com.fasterxml.jackson.core.type.TypeReference<>() {
                     });
             String accessToken = (String) map.get("access_token");
             if (accessToken == null || accessToken.isEmpty()) {
+                log.warn("获取环信用户token失败, 响应缺少access_token, username={}, responseBody={}", username, respBody);
                 return null;
             }
+            log.info("获取环信用户token成功, username={}", username);
             return accessToken;
         } catch (IOException e) {
-            log.error("fetchUserToken error", e);
+            log.error("获取环信用户token异常, username={}", username, e);
             return null;
         }
     }
@@ -78,14 +82,14 @@ public class EasemobUserTokenClient {
                 .header("Content-Type", "application/json")
                 .build();
         try (Response response = http.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                String bodyStr = response.body() != null ? response.body().string() : "";
-                log.error("Easemob register user failed: {} {}", response, bodyStr);
-                throw new RuntimeException("Easemob register user failed: " + response + " " + bodyStr);
+            String respBody = response.body() == null ? null : response.body().string();
+            if (!response.isSuccessful()) {
+                log.error("注册环信用户失败, username={}, status={}, responseBody={}", username, response.code(), respBody);
+                throw new RuntimeException("Easemob register user failed: " + response.code() + " " + respBody);
             }
-            log.info("Easemob user registered: {}", username);
+            log.info("注册环信用户成功, username={}", username);
         } catch (IOException e) {
-            log.error("registerUser error", e);
+            log.error("注册环信用户异常, username={}", username, e);
             throw new RuntimeException("Easemob register user error", e);
         }
     }

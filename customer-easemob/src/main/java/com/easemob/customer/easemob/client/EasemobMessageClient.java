@@ -18,6 +18,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EasemobMessageClient {
 
+    private static final int MAX_CONTENT_LENGTH = 100;
+
     private final EasemobProperties props;
     private final AppTokenManager tokenManager;
     private final OkHttpClient http;
@@ -37,7 +39,9 @@ public class EasemobMessageClient {
         if (ext != null && !ext.isEmpty()) {
             body.put("ext", ext);
         }
-        postJson(url, body);
+        log.info("发送群消息, from={}, groupId={}, content={}", from, groupId, truncate(text));
+        postJson("发送群消息", url, body);
+        log.info("群消息发送成功, from={}, groupId={}", from, groupId);
     }
 
     public void sendUserText(String from, String toUserId, String text) {
@@ -48,10 +52,12 @@ public class EasemobMessageClient {
                 "type", "txt",
                 "target_type", "users",
                 "body", Map.of("msg", text));
-        postJson(url, body);
+        log.info("发送单聊消息, from={}, to={}, content={}", from, toUserId, truncate(text));
+        postJson("发送单聊消息", url, body);
+        log.info("单聊消息发送成功, from={}, to={}", from, toUserId);
     }
 
-    private JsonNode postJson(String url, Map<String, Object> body) {
+    private JsonNode postJson(String action, String url, Map<String, Object> body) {
         RequestBody requestBody = RequestBody.create(JsonUtil.toJson(body), MediaType.parse("application/json; charset=utf-8"));
         Request request = new Request.Builder()
                 .url(url)
@@ -59,13 +65,23 @@ public class EasemobMessageClient {
                 .post(requestBody)
                 .build();
         try (Response response = http.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new RuntimeException("Easemob message send error: " + response);
+            String respBody = response.body() == null ? null : response.body().string();
+            if (!response.isSuccessful()) {
+                log.error("环信消息发送失败, action={}, url={}, status={}, responseBody={}",
+                        action, url, response.code(), respBody);
+                throw new RuntimeException("Easemob message send error: " + response.code() + " " + respBody);
             }
-            return JsonUtil.fromJson(response.body().string(), JsonNode.class);
+            return JsonUtil.fromJson(respBody, JsonNode.class);
         } catch (IOException e) {
-            log.error("Easemob message send error, url={}", url, e);
+            log.error("环信消息发送异常, action={}, url={}", action, url, e);
             throw new RuntimeException("Easemob message send error", e);
         }
+    }
+
+    private String truncate(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.length() > MAX_CONTENT_LENGTH ? text.substring(0, MAX_CONTENT_LENGTH) + "..." : text;
     }
 }

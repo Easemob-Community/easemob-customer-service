@@ -41,7 +41,7 @@ public class AssignmentService {
 
     @Transactional
     public void transferToHuman(CsSession session, String reason) {
-        log.info("transferToHuman start, sessionId={}, userId={}", session.getId(), session.getUserAccountId());
+        log.info("转人工开始, sessionId={}, userId={}, transferType={}", session.getId(), session.getUserAccountId(), reason);
         if (session.getUserAccountId() == null) {
             throw new BizException(4002, "会话用户信息缺失");
         }
@@ -49,31 +49,35 @@ public class AssignmentService {
         try {
             boolean locked = lock.tryLock(3, 30, TimeUnit.SECONDS);
             if (!locked) {
-                log.warn("transferToHuman lock not acquired, sessionId={}", session.getId());
+                log.warn("转人工获取锁失败, sessionId={}, transferType={}", session.getId(), reason);
                 return;
             }
             try {
                 if (!SessionStatus.AI_SERVING.name().equals(session.getStatus())) {
-                    log.info("transferToHuman skip, status={}, sessionId={}", session.getStatus(), session.getId());
+                    log.info("转人工跳过, 会话状态非AI服务中, sessionId={}, status={}, transferType={}",
+                            session.getId(), session.getStatus(), reason);
                     return;
                 }
                 AssignContext ctx = buildContext(session);
-                log.info("transferToHuman ctx, sessionId={}, userId={}, skillGroupId={}", session.getId(), ctx.getUserId(), ctx.getSkillGroupId());
-                Optional<CsAccount> agent = strategyChain().stream()
-                        .map(s -> {
-                            Optional<CsAccount> r = s.assign(ctx);
-                            log.info("transferToHuman strategy {}, result={}, sessionId={}", s.type(), r.map(CsAccount::getEasemobId).orElse("none"), session.getId());
-                            return r;
-                        })
-                        .filter(Optional::isPresent)
-                        .map(Optional::get)
-                        .findFirst();
-                log.info("transferToHuman agent={}, sessionId={}", agent.map(CsAccount::getEasemobId).orElse("none"), session.getId());
+                log.info("转人工上下文, sessionId={}, userId={}, skillGroupId={}", session.getId(), ctx.getUserId(), ctx.getSkillGroupId());
+                Optional<CsAccount> agent = Optional.empty();
+                for (AssignmentStrategy s : strategyChain()) {
+                    Optional<CsAccount> r = s.assign(ctx);
+                    if (r.isPresent()) {
+                        log.info("转人工策略命中, strategy={}, agentId={}, sessionId={}", s.type(), r.get().getEasemobId(), session.getId());
+                        agent = r;
+                        break;
+                    }
+                    log.info("转人工策略未命中, strategy={}, sessionId={}", s.type(), session.getId());
+                }
                 if (agent.isEmpty()) {
                     sessionService.markWaiting(session, reason);
                     waitQueueService.enqueue(session);
+                    int position = waitQueueService.position(session).intValue();
+                    log.info("转人工无可用坐席, 进入排队, sessionId={}, queuePosition={}, transferType={}",
+                            session.getId(), position, reason);
                     messageClient.sendGroupText(session.getAiAccountId(), session.getGroupId(),
-                            "正在为您排队，当前第 " + waitQueueService.position(session) + " 位，请稍候～");
+                            "正在为您排队，当前第 " + position + " 位，请稍候～");
                     return;
                 }
                 groupClient.addMember(session.getGroupId(), agent.get().getEasemobId());
@@ -86,7 +90,8 @@ public class AssignmentService {
                 );
                 messageClient.sendGroupText(agent.get().getEasemobId(), session.getGroupId(),
                         "客服 " + agent.get().getNickname() + " 为您服务，请问有什么可以帮您？", ext);
-                log.info("transferToHuman done, sessionId={}, agentId={}", session.getId(), agent.get().getEasemobId());
+                log.info("转人工完成, sessionId={}, agentId={}, transferType={}",
+                        session.getId(), agent.get().getEasemobId(), reason);
             } finally {
                 if (lock.isHeldByCurrentThread()) {
                     lock.unlock();

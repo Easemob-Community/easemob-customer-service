@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
-    public R<Void> handleBizException(BizException e) {
-        log.warn("BizException: code={}, msg={}", e.getCode(), e.getMessage());
+    public R<Void> handleBizException(BizException e, HttpServletRequest req) {
+        log.warn("[{}] BizException: code={}, msg={}", req.getRequestURI(), e.getCode(), e.getMessage());
         return R.fail(e.getCode(), e.getMessage());
     }
 
     @ExceptionHandler({BindException.class, IllegalArgumentException.class})
-    public R<Void> handleParamException(Exception e) {
-        log.warn("Param error: {}", e.getMessage());
+    public R<Void> handleParamException(Exception e, HttpServletRequest req) {
+        log.warn("[{}] Param error: {}", req.getRequestURI(), e.getMessage());
         return R.fail(400, "请求参数错误：" + e.getMessage());
     }
 

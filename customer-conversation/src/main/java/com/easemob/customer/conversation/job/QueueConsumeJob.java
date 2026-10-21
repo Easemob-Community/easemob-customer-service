@@ -16,7 +16,7 @@ public class QueueConsumeJob {
 
     @Scheduled(fixedDelay = 5_000)
     public void consumeWaitQueue() {
-        log.info("QueueConsumeJob start");
+        log.debug("QueueConsumeJob start");
         eventPublisher.publishEvent(new QueueConsumeEvent(0L, 0L));
     }
 }

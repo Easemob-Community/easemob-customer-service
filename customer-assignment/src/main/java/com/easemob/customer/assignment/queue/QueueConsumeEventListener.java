@@ -20,17 +20,20 @@ public class QueueConsumeEventListener {
 
     @EventListener
     public void onQueueConsume(QueueConsumeEvent event) {
-        log.info("Queue consume event received, sessionId={}, skillGroupId={}",
+        log.debug("收到排队消费事件, sessionId={}, skillGroupId={}",
                 event.getSessionId(), event.getSkillGroupId());
         Long sessionId = waitQueueService.dequeue(event.getSkillGroupId());
         if (sessionId == null) {
+            log.debug("排队消费无待分配会话, skillGroupId={}", event.getSkillGroupId());
             return;
         }
         CsSession session = sessionService.getById(sessionId);
         if (session == null) {
+            log.warn("排队消费会话不存在, sessionId={}", sessionId);
             return;
         }
-        log.info("Queue consume assigning sessionId={}", sessionId);
+        log.info("排队消费开始重试分配, sessionId={}", sessionId);
         assignmentService.transferToHuman(session, "QUEUE_ASSIGN");
+        log.info("排队消费重试分配结束, sessionId={}, status={}", sessionId, session.getStatus());
     }
 }

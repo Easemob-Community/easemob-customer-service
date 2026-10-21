@@ -12,6 +12,7 @@ import com.easemob.customer.conversation.entity.CsSession;
 import com.easemob.customer.conversation.mapper.MessageMapper;
 import com.easemob.customer.conversation.mapper.SessionMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,10 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/open/message")
 @RequiredArgsConstructor
 public class GuestMessageController {
+
+    private static final int MAX_CONTENT_LENGTH = 100;
 
     private final SessionMapper sessionMapper;
     private final MessageMapper messageMapper;
@@ -33,6 +37,9 @@ public class GuestMessageController {
     public R<Void> record(@RequestBody Map<String, Object> body) {
         String userId = StpUtil.getLoginId().toString();
         Long sessionId = Long.valueOf(body.getOrDefault("sessionId", "0").toString());
+        String content = body.getOrDefault("content", "").toString();
+        log.info("收到访客消息, userId={}, sessionId={}, content={}",
+                userId, sessionId, truncate(content));
         CsSession session = sessionMapper.selectById(sessionId);
         if (session == null || !session.getUserAccountId().equals(userId)) {
             throw new BizException(4003, "会话不存在或不匹配");
@@ -49,7 +56,7 @@ public class GuestMessageController {
         message.setSenderId(userId);
         message.setSenderType(MsgSenderType.USER.name());
         message.setMsgType(body.getOrDefault("type", MsgType.TXT.name()).toString());
-        message.setContent(body.getOrDefault("content", "").toString());
+        message.setContent(content);
         messageMapper.insert(message);
 
         session.setLastMsgTime(LocalDateTime.now());
@@ -59,5 +66,12 @@ public class GuestMessageController {
         // （生产环境若配置了环信回调，AiChatService 内部按内容去重，不会重复回复）
         aiChatService.handleUserMessage(session, message.getContent());
         return R.ok();
+    }
+
+    private String truncate(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.length() > MAX_CONTENT_LENGTH ? text.substring(0, MAX_CONTENT_LENGTH) + "..." : text;
     }
 }

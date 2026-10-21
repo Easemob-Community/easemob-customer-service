@@ -19,6 +19,6 @@ public class SessionTimeoutJob {
 
     @Scheduled(fixedDelay = 60_000)
     public void closeTimeoutSessions() {
-        log.info("SessionTimeoutJob start");
+        log.debug("SessionTimeoutJob start");
     }
 }

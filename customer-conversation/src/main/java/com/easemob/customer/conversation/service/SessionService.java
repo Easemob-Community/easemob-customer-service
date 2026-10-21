@@ -35,13 +35,15 @@ public class SessionService {
 
     @Transactional
     public StartSessionResp start(StartSessionReq req) {
+        log.info("开始会话, userId={}, channel={}, skillGroupId={}, aiGroupId={}",
+                req.getUserId(), req.getChannel(), req.getSkillGroupId(), req.getAiGroupIdOrDefault());
         CsSession existing = sessionMapper.selectActiveByUser(req.getUserId());
         if (existing != null) {
+            log.info("复用已有会话, sessionId={}, status={}", existing.getId(), existing.getStatus());
             return StartSessionResp.of(existing);
         }
         CsAccount ai = accountService.pickAiAccount(req.getAiGroupIdOrDefault());
-        log.info("start session, userId={}, channel={}, skillGroupId={}, pickedAi={}",
-                req.getUserId(), req.getChannel(), req.getSkillGroupId(), ai.getEasemobId());
+        log.info("已选取AI坐席, userId={}, pickedAi={}", req.getUserId(), ai.getEasemobId());
         String groupId = groupClient.createGroup(req.getUserId(), List.of(ai.getEasemobId()),
                 "cs-" + IdUtil.fastSimpleUUID());
         CsSession session = new CsSession();
@@ -57,6 +59,8 @@ public class SessionService {
         sessionMapper.insert(session);
         redis.opsForValue().set(RedisKeyConstant.currentSessionKey(req.getUserId()), String.valueOf(session.getId()));
         messageClient.sendGroupText(ai.getEasemobId(), groupId, "您好，我是智能客服小环～");
+        log.info("创建会话成功, sessionId={}, groupId={}, aiAccountId={}, status={}, handlerType={}",
+                session.getId(), session.getGroupId(), ai.getEasemobId(), session.getStatus(), session.getCurrentHandlerType());
         return StartSessionResp.builder()
                 .sessionId(session.getId())
                 .groupId(session.getGroupId())
@@ -70,8 +74,10 @@ public class SessionService {
 
     @Transactional
     public void close(Long sessionId, String by, String reason) {
+        log.info("关闭会话, sessionId={}, by={}, reason={}", sessionId, by, reason);
         CsSession s = sessionMapper.selectById(sessionId);
         if (s == null || SessionStatus.CLOSED.name().equals(s.getStatus())) {
+            log.info("关闭会话跳过, 会话不存在或已关闭, sessionId={}", sessionId);
             return;
         }
         sessionMapper.updateStatusClosed(sessionId, reason);
@@ -101,6 +107,8 @@ public class SessionService {
         session.setAgentAccountId(agent.getEasemobId());
         session.setCurrentHandlerType(HandlerType.HUMAN.name());
         session.setTransferReason(reason);
+        log.info("会话切换为人工服务, sessionId={}, agentId={}, reason={}",
+                session.getId(), agent.getEasemobId(), reason);
     }
 
     @Transactional
@@ -108,6 +116,7 @@ public class SessionService {
         sessionMapper.updateWaiting(session.getId(), reason);
         session.setCurrentHandlerType(HandlerType.HUMAN.name());
         session.setTransferReason(reason);
+        log.info("会话标记为等待人工, sessionId={}, reason={}", session.getId(), reason);
     }
 
     public CsSession selectActiveByUser(String userId) {
