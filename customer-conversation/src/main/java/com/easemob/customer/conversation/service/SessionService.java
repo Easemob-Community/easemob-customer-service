@@ -74,12 +74,14 @@ public class SessionService {
 
     @Transactional
     public void close(Long sessionId, String by, String reason) {
-        log.info("关闭会话, sessionId={}, by={}, reason={}", sessionId, by, reason);
         CsSession s = sessionMapper.selectById(sessionId);
-        if (s == null || SessionStatus.CLOSED.name().equals(s.getStatus())) {
-            log.info("关闭会话跳过, 会话不存在或已关闭, sessionId={}", sessionId);
+        if (s == null || SessionStatus.CLOSED.name().equals(s.getStatus())
+                || SessionStatus.EVALUATED.name().equals(s.getStatus())) {
+            log.info("关闭会话跳过, 会话不存在或已结束, sessionId={}, status={}",
+                    sessionId, s == null ? "null" : s.getStatus());
             return;
         }
+        log.info("关闭会话, sessionId={}, by={}, reason={}", sessionId, by, reason);
         sessionMapper.updateStatusClosed(sessionId, reason);
         if (HandlerType.HUMAN.name().equals(s.getCurrentHandlerType()) && s.getAgentAccountId() != null) {
             accountService.decrLoad(s.getAgentAccountId());

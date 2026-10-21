@@ -21,7 +21,7 @@ public class EvaluateService {
     @Transactional
     public void evaluate(EvaluateReq req) {
         CsSession session = sessionMapper.selectById(req.getSessionId());
-        if (session == null) {
+        if (session == null || SessionStatus.EVALUATED.name().equals(session.getStatus())) {
             return;
         }
         CsEvaluate evaluate = new CsEvaluate();
@@ -31,8 +31,11 @@ public class EvaluateService {
         evaluate.setComment(req.getComment());
         evaluateMapper.insert(evaluate);
 
-        session.setStatus(SessionStatus.EVALUATED.name());
-        sessionMapper.updateById(session);
         sessionService.close(req.getSessionId(), "USER", "EVALUATED");
+
+        CsSession update = new CsSession();
+        update.setId(req.getSessionId());
+        update.setStatus(SessionStatus.EVALUATED.name());
+        sessionMapper.updateById(update);
     }
 }
