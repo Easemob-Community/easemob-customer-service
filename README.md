@@ -2,6 +2,12 @@
 
 基于环信 IM 的「AI 客服 + 人工客服」一体化客服系统的自建后端。负责账号体系、会话管理、坐席分配策略、AI 应答编排与数据沉淀;IM 能力(群组/消息/回调)复用环信云。
 
+## 相关仓库
+
+- Web 访客端:[easemob-customer-web](https://github.com/Easemob-Community/easemob-customer-web)
+- 管理控制台:[easemob-customer-console](https://github.com/Easemob-Community/easemob-customer-console)
+- 移动端(Flutter,iOS/Android):[easemob-customer-app](https://github.com/Easemob-Community/easemob-customer-app)
+
 ## 技术栈
 
 Java 17+ · Spring Boot 3.2 · MyBatis-Plus · MySQL 8 · Redis 7 + Redisson · OkHttp(环信/AI 调用) · Sa-Token · Knife4j 接口文档 · Maven 多模块
